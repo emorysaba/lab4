@@ -3,7 +3,6 @@
 	       Error Handling, Options, and Exceptions
  *)
 
-
 (*======================================================================
 Part 1: Currying and uncurrying
 
@@ -32,12 +31,93 @@ To think about before you start coding:
 Now implement the two functions curry and uncurry.
 ......................................................................*)
 
-let curry (f: ('a * 'b) -> 'c) (x: 'a) (y: 'b) =
-  f (x, y);;
+(* In order to think through this problem, it helps to start with the
+types of the functions. The curry function is a *function*; it has a
+function type, of the form _ -> _. It is intended to take an uncurried
+binary function as its argument, and return the corresponding curried
+function. An uncurried binary function is a function that takes its
+two arguments both "at the same time", that is, as a
+pair. Generically, the type of such a function is thus 'a * 'b ->
+'c. A curried binary function takes its two arguments "one at a
+time". Its type is 'a -> ('b -> 'c). Putting these together, the type
+of curry should be
 
-let uncurry (f: 'a -> 'b -> 'c) (z: 'a * 'b) =
-  match z with
-  | (x, y) -> f x y;;
+    (('a * 'b) -> 'c) -> ('a -> ('b -> 'c))      .
+
+(Dropping extraneous parentheses since the -> type operator is right
+associative, we can also right this as
+
+    (('a * 'b) -> 'c) -> 'a -> 'b -> 'c      .)
+
+This type information already gives us a big hint as to how to write
+the curry function. We start with the first line giving the argument
+structure:
+
+    let curry (uncurried : ('a * 'b) -> 'c) : 'a -> 'b -> 'c = ...
+
+We call the argument function "uncurried" to emphasize that it is an
+uncurried function, and indeed, its type is consistent with that.
+
+The return type is a function type, so we'll want to build a function
+value to return. We use the "fun _ -> _" anonymous function
+construction to do so, carefully labeling the type of the function's
+argument as a reminder of what's going on:
+
+    let curry (uncurried : ('a * 'b) -> 'c) : 'a -> 'b -> 'c =
+      fun (x : 'a) -> ...
+
+The type of the argument of this anonymous function is 'a because its
+type as a whole -- the return type of curry itself -- is 'a -> ('b ->
+'c). This function should return a function of type 'b -> 'c. We'll
+construct that as an anonymous function as well:
+
+    let curry (uncurried : ('a * 'b) -> 'c) : 'a -> 'b -> 'c =
+      fun (x : 'a) ->
+        fun (y : 'b) -> ...
+
+Now, how should we construct the value (of type 'c) that this inner
+function should return? Remember that curry should return a curried
+function whose value is the same as the uncurried function would have
+delivered on arguments x and y. So we can simply apply uncurried to x
+and y (in an uncurried fashion, of course), to obtain the value of
+type 'c:
+
+    let curry (uncurried : ('a * 'b) -> 'c) : 'a -> 'b -> 'c =
+      fun (x : 'a) ->
+        fun (y : 'b) -> uncurried (x, y) ;;
+
+You'll note that all of these anonymous functions are a bit
+cumbersome, and we have a nicer notation for defining functions in let
+expressions incorporating the arguments in the definition part
+itself. We've already done so for the argument uncurried. Let's use
+that notation for the x and y arguments as well.
+
+    let curry (uncurried : ('a * 'b) -> 'c) (x : 'a) (y : 'b) : 'c =
+      uncurried (x, y) ;;
+
+To make clearer what's going on, we can even drop the explicit types
+to show the structure of the computation:
+
+    let curry uncurried x y = uncurried (x, y) ;;
+
+Here, we see what's really going on: "curry uncurried" when applied to
+x and y in curried fashion gives the same value that uncurried gives
+when applied to x and y in uncurried fashion.
+
+By a similar argument (which it might be useful to carry out
+yourself), uncurry is implemented as
+
+    let uncurry curried (x, y) = curried x y ;;
+
+Below, we use the version with explicit types, as we generally want to
+do to make our typing intentions known to the compiler/interpreter.
+ *)
+
+let curry (uncurried : ('a * 'b) -> 'c) (x : 'a) (y : 'b) : 'c =
+  uncurried (x, y) ;;
+
+let uncurry (curried : 'a -> 'b -> 'c) ((x, y) : ('a * 'b)) : 'c =
+  curried x y ;;
 
 (*......................................................................
 Exercise 2: OCaml's built in binary operators, like ( + ) and ( * ) are
@@ -52,11 +132,10 @@ Using your uncurry function, define uncurried versions of the plus and
 times functions.
 ......................................................................*)
 
-let plus (x: int) (y: int) : int =
-  uncurry (fun a b -> a + b) (x, y);;
+let plus = uncurry ( + ) ;;
 
-let times (x: int) (y: int) : int =
-  uncurry (fun a b -> a * b) (x, y);;
+
+let times = uncurry ( * ) ;;
 
 (*......................................................................
 Exercise 3: Recall the prods function from Lab 1:
@@ -69,6 +148,7 @@ let rec prods (lst : (int * int) list) : int list =
 Now reimplement prods using map and your uncurried times function. Why
 do you need the uncurried times function?
 ......................................................................*)
+
 
 let prods = List.map times ;;
 
@@ -107,9 +187,10 @@ be used when called on an empty list.
 let rec max_list_opt (lst : int list) : int option =
   match lst with
   | [] -> None
-  | head :: tail ->match (max_list_opt tail) with
-    | None -> Some head
-    | Some max_tail -> Some (max head max_tail) ;;
+  | head :: tail ->
+     match (max_list_opt tail) with
+     | None -> Some head
+     | Some max_tail -> Some (max head max_tail) ;;
 
 (*......................................................................
 Exercise 5: Alternatively, we could have max_list raise an exception
@@ -120,7 +201,7 @@ textbook for some advice.)
 
 let rec max_list (lst : int list) : int =
   match lst with
-  | [] -> raise (Invalid_argument "Empty list")
+  | [] -> raise (Invalid_argument "max_list: empty list")
   | [elt] -> elt
   | head :: tail -> max head (max_list tail) ;;
 
@@ -133,11 +214,11 @@ are handled; no nonexhaustive match warnings!
 ......................................................................*)
 
 let min_option (x : int option) (y : int option) : int option =
-  match x,y with
-  | None, None -> None
-  | None, y -> y
-  | x, None -> x
-  | x, y -> min x y;;
+  match x, y with
+  | None,      None       -> None
+  | None,      Some right -> Some right
+  | Some left, None       -> Some left
+  | Some left, Some right -> Some (min left right) ;;
 
 (*......................................................................
 Exercise 7: Write a function plus_option to return the sum of two int
@@ -147,9 +228,9 @@ return the other.
 
 let plus_option (x : int option) (y : int option) : int option =
   match x, y with
-  | None, None -> None
-  | None, Some right -> Some right
-  | Some left, None -> Some left
+  | None,      None       -> None
+  | None,      Some right -> Some right
+  | Some left, None       -> Some left
   | Some left, Some right -> Some (left + right) ;;
 
 (*======================================================================
@@ -173,7 +254,8 @@ What is calc_option's function type signature?
 Now implement calc_option.
 ......................................................................*)
 
-let calc_option (f : 'a -> 'a -> 'a) (x : 'a option) (y : 'a option): 'a option =
+let calc_option (f : 'a -> 'a -> 'a) (x : 'a option) (y : 'a option)
+              : 'a option =
   match x, y with
   | None,      None       -> None
   | None,      Some right -> Some right
@@ -185,8 +267,57 @@ Exercise 9: Now rewrite min_option and plus_option using the higher-order
 function calc_option. Call them min_option_2 and plus_option_2.
 ......................................................................*)
 
-let min_option_2 x y =
-  calc_option min x y ;;
+let min_option_2 : int option -> int option -> int option =
+  calc_option min ;;
+
+(* You may have not added in the specific type information in your
+definition of min_option_2, and received an inscrutable warning
+involving "weak type variables", and type problems when submitting
+your code. Here's an example of that behavior:
+
+  # let min_option_2 =
+      calc_option min ;;
+  val min_option_2 : '_weak1 option -> '_weak1 option -> '_weak1 option = <fun>
+  # min_option_2 (Some 3) (Some 4) ;;
+  - : int option = Some 3
+  # min_option_2 (Some 4.2) (Some 4.1) ;;
+  Error: This expression [namely, the 4.2] has type float but an expression
+         was expected of type int
+
+The type variables like '_weak1 (with the underscore) are "weak type
+variables", not true type variables. Weak type variables are discussed
+briefly in as discussed in Section 9.6 of the textbook. They arise
+because in certain situations OCaml's type inference can't figure out
+how to express the most general types and must resort to this weak
+type variable approach.
+
+When a function with these weak type variables is applied to arguments
+with a specific type, the polymorphism of the function
+disappears. Notice that the first time we apply min_option_2 above to
+int options, things work fine. But the second time, applied to float
+options, there's a type clash because the first use of min_option_2
+fixed the weak type variables to be ints. Since our unit tests try
+using min_option_2 in certain ways inconsistent with weak type
+variables, you'll get an error message saying that "The type of this
+expression, '_weak1 option -> '_weak1 option -> '_weak1 option,
+contains type variables that cannot be generalized."
+
+To correct the problem, you can add in specific typing information (as
+we've done in the solution below) or, even better, make explicit the
+full application of calc_option:
+
+  let min_option_2 x y =
+    calc_option min x y ;;
+
+rather than the partial application we use below. Either of these
+approaches gives OCaml sufficient hints to infer types more
+accurately.
+
+For the curious, if you want to see what's going on in detail, you can
+check out the discussion in the section "A function obtained through
+partial application is not polymorphic enough" at
+https://ocaml.org/learn/faq.html#Typing.
+ *)
 
 let plus_option_2 : int option -> int option -> int option =
   calc_option (+) ;;
@@ -225,9 +356,11 @@ type in case it is called with lists of unequal length.
 let rec zip_opt (x : 'a list) (y : 'b list) : (('a * 'b) list) option =
   match (x, y) with
   | [], [] -> Some []
-  | xhd :: xtl, yhd :: ytl ->(match zip_opt xtl ytl with
+  | xhd :: xtl, yhd :: ytl ->
+     (match zip_opt xtl ytl with
       | None -> None
-      | Some ztl -> Some ((xhd, yhd) :: ztl))| _, _ -> None ;;
+      | Some ztl -> Some ((xhd, yhd) :: ztl))
+  | _, _ -> None ;;
 
 (*====================================================================
 Part 4: Factoring out None-handling
@@ -281,17 +414,23 @@ you above.)  Your new solution for dotprod should be much simpler than
 the version we provided above at the top of Part 4.
 ......................................................................*)
 
-let dotprod = "hello"
+let dotprod (a : int list) (b : int list) : int option =
+  maybe (fun pairs -> sum (prods pairs))
+        (zip_opt a b) ;;
 
 (*......................................................................
 Exercise 14: Reimplement zip_opt along the same lines, in zip_opt_2
 below.
 ......................................................................*)
 
+(* We remove the embedded match using a maybe: *)
+
 let rec zip_opt_2 (x : 'a list) (y : 'b list) : (('a * 'b) list) option =
   match (x, y) with
   | [], [] -> Some []
-  | xhd :: xtl, yhd :: ytl ->maybe (fun ztl -> ((xhd, yhd) :: ztl))(zip_opt_2 xtl ytl)
+  | xhd :: xtl, yhd :: ytl ->
+     maybe (fun ztl -> ((xhd, yhd) :: ztl))
+           (zip_opt_2 xtl ytl)
   | _, _ -> None ;;
 
 (*......................................................................
@@ -304,4 +443,6 @@ let rec max_list_opt_2 (lst : int list) : int option =
   match lst with
   | [] -> None
   | [single] -> Some single
-  | head :: tail ->maybe (fun max_tail -> max head max_tail)(max_list_opt_2 tail) ;;
+  | head :: tail ->
+     maybe (fun max_tail -> max head max_tail)
+           (max_list_opt_2 tail) ;;
