@@ -280,9 +280,7 @@ you above.)  Your new solution for dotprod should be much simpler than
 the version we provided above at the top of Part 4.
 ......................................................................*)
 
-let dotprod (a : int list) (b : int list) : int option =
-  maybe (fun pairs -> sum (prods pairs))
-    (zip_opt a b) ;;
+let dotprod = "hello"
 
 (*......................................................................
 Exercise 14: Reimplement zip_opt along the same lines, in zip_opt_2
