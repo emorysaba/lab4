@@ -107,8 +107,9 @@ be used when called on an empty list.
 let rec max_list_opt (lst : int list) : int option =
   match lst with
   | [] -> None
-  | [elt] -> Some elt
-  | head :: tail -> Some (let Some v = max_list_opt tail in max head v) ;;
+  | head :: tail ->match (max_list_opt tail) with
+    | None -> Some head
+    | Some max_tail -> Some (max head max_tail) ;;
 
 (*......................................................................
 Exercise 5: Alternatively, we could have max_list raise an exception
